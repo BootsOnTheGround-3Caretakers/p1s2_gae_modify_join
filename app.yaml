@@ -1,0 +1,13 @@
+service: modify-joins
+runtime: python27
+threadsafe: True
+api_version: 1
+#version: 1
+
+automatic_scaling:
+  max_pending_latency: 3000ms
+
+handlers:
+- url: /.*
+  script: main.app
+  login: admin
