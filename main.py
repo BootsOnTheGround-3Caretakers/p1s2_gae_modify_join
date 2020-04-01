@@ -530,7 +530,7 @@ class AssignHashtagToUser(webapp2.RequestHandler, CommonPostHandler):
             }
 
         user_uid = long(user_uid)
-        hashtaguid = long(hashtag_uid)
+        hashtag_uid = long(hashtag_uid)
 
         existings_keys = [
             ndb.Key(Datastores.users._get_kind(), user_uid),
@@ -571,6 +571,72 @@ class AssignHashtagToUser(webapp2.RequestHandler, CommonPostHandler):
         return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
 
 
+class RemoveHashtagFromUser(webapp2.RequestHandler, CommonPostHandler):
+    def processPushTask(self):
+        task_id = "modify-joins:RemoveHashtagFromUser:processPushTask"
+        return_msg = task_id + ": "
+        debug_data = []
+        task_results = {}
+
+        # verify input data
+        transaction_id = unicode(self.request.get("transaction_id", ""))
+        transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
+        user_uid = unicode(self.request.get(TaskArguments.s2t8_user_uid, ""))
+        hashtag_uid = unicode(self.request.get(TaskArguments.s2t8_hashtag_uid, ""))
+
+        call_result = self.ruleCheck([
+            [transaction_id, PostDataRules.required_name],
+            [transaction_user_uid, PostDataRules.internal_uid],
+            [user_uid, PostDataRules.internal_uid],
+            [hashtag_uid, PostDataRules.internal_uid],
+        ])
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "input validation failed"
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        transaction_user_uid = long(transaction_user_uid)
+        user_uid = long(user_uid)
+        hashtag_uid = long(hashtag_uid)
+
+        existings_keys = [
+            ndb.Key(Datastores.users._get_kind(), user_uid),
+            ndb.Key(Datastores.hashtags._get_kind(), hashtag_uid),
+        ]
+
+        for existing_key in existings_keys:
+            call_result = DSF.kget(existing_key)
+            debug_data.append(call_result)
+            if call_result['success'] != RC.success:
+                return_msg += "Datastore access failed"
+                return {
+                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            if not call_result['get_result']:
+                return_msg += "{} not found".format(existing_key.kind())
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+        # </end> verify input data
+
+        key = ndb.Key(Datastores.users._get_kind(), user_uid, Datastores.hashtag_pointer._get_kind(), hashtag_uid)
+        call_result = DSF.kdelete(transaction_user_uid, key)
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to delete hashtag_pointer from datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
+        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+
 app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_cluster_user.url, AddModifyClusterUser),
     (Services.modify_joins.remove_user_from_cluster.url, RemoveUserFromCluster),
@@ -579,4 +645,5 @@ app = webapp2.WSGIApplication([
     (Services.modify_joins.remove_need_from_needer.url, RemoveNeedFromNeeder),
     (Services.modify_joins.remove_needer_from_user.url, RemoveNeederFromUser),
     (Services.modify_joins.assign_hashtag_to_user.url, AssignHashtagToUser),
+    (Services.modify_joins.remove_hashtag_from_user.url, RemoveHashtagFromUser),
 ], debug=True)
