@@ -316,9 +316,9 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
         user_uid = long(user_uid)
 
         existings_keys = [
-            ndb.Key(Datastores.needer._get_kind(), needer_uid),
-            ndb.Key(Datastores.needs._get_kind(), need_uid),
             ndb.Key(Datastores.users._get_kind(), user_uid),
+            ndb.Key(Datastores.users._get_kind(), user_uid, Datastores.needer._get_kind(), needer_uid),
+            ndb.Key(Datastores.needs._get_kind(), need_uid),
         ]
 
         for existing_key in existings_keys:
@@ -394,9 +394,9 @@ class RemoveNeedFromNeeder(webapp2.RequestHandler, CommonPostHandler):
         user_uid = long(user_uid)
 
         existings_keys = [
-            ndb.Key(Datastores.needer._get_kind(), needer_uid),
-            ndb.Key(Datastores.needs._get_kind(), need_uid),
             ndb.Key(Datastores.users._get_kind(), user_uid),
+            ndb.Key(Datastores.users._get_kind(), user_uid, Datastores.needer._get_kind(), needer_uid),
+            ndb.Key(Datastores.needs._get_kind(), need_uid),
         ]
 
         for existing_key in existings_keys:
@@ -433,10 +433,80 @@ class RemoveNeedFromNeeder(webapp2.RequestHandler, CommonPostHandler):
         return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
 
 
+class RemoveNeederFromUser(webapp2.RequestHandler, CommonPostHandler):
+    def processPushTask(self):
+        task_id = "modify-joins:RemoveNeederFromUser:processPushTask"
+        return_msg = task_id + ": "
+        debug_data = []
+        task_results = {}
+
+        # verify input data
+        transaction_id = unicode(self.request.get("transaction_id", ""))
+        transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
+        needer_uid = unicode(self.request.get(TaskArguments.s2t6_needer_uid, ""))
+        user_uid = unicode(self.request.get(TaskArguments.s2t6_user_uid, ""))
+
+        call_result = self.ruleCheck([
+            [transaction_id, PostDataRules.required_name],
+            [transaction_user_uid, PostDataRules.internal_uid],
+            [needer_uid, PostDataRules.internal_uid],
+            [user_uid, PostDataRules.internal_uid],
+        ])
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "input validation failed"
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        transaction_user_uid = long(transaction_user_uid)
+        needer_uid = long(needer_uid)
+        user_uid = long(user_uid)
+
+        existings_keys = [
+            ndb.Key(Datastores.users._get_kind(), user_uid),
+            ndb.Key(Datastores.users._get_kind(), user_uid, Datastores.needer._get_kind(), needer_uid),
+        ]
+
+        for existing_key in existings_keys:
+            call_result = DSF.kget(existing_key)
+            debug_data.append(call_result)
+            if call_result['success'] != RC.success:
+                return_msg += "Datastore access failed"
+                return {
+                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            if not call_result['get_result']:
+                return_msg += "{} not found".format(existing_key.kind())
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+        # </end> verify input data
+
+        key = ndb.Key(
+            Datastores.users._get_kind(), user_uid,
+            Datastores.needer._get_kind(), needer_uid
+        )
+        call_result = DSF.kdelete(transaction_user_uid, key)
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to delete needer from datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
+        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+
 app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_cluster_user.url, AddModifyClusterUser),
     (Services.modify_joins.remove_user_from_cluster.url, RemoveUserFromCluster),
     (Services.modify_joins.add_modify_user_skill.url, AddModifyUserSkill),
     (Services.modify_joins.add_modify_need_to_needer.url, AddModifyNeedToNeeder),
     (Services.modify_joins.remove_need_from_needer.url, RemoveNeedFromNeeder),
+    (Services.modify_joins.remove_needer_from_user.url, RemoveNeederFromUser),
 ], debug=True)
