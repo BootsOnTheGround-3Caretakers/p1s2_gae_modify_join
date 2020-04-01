@@ -63,6 +63,86 @@ class CommonPostHandler(DataValidation):
         self.response.set_status(200)
 
 
+class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
+    def processPushTask(self):
+        task_id = "modify-joins:AddModifyClusterUser:processPushTask"
+        return_msg = task_id + ": "
+        debug_data = []
+        task_results = {}
+
+        # verify input data
+        transaction_id = unicode(self.request.get("transaction_id", ""))
+        transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
+        cluster_uid = unicode(self.request.get(TaskArguments.s2t1_cluster_uid, ""))
+        user_uid = unicode(self.request.get(TaskArguments.s2t1_user_uid, ""))
+        user_roles = unicode(self.request.get(TaskArguments.s2t1_user_roles, ""))
+
+        call_result = self.ruleCheck([
+            [transaction_id, PostDataRules.required_name],
+            [transaction_user_uid, PostDataRules.internal_uid],
+            [cluster_uid, PostDataRules.internal_uid],
+            [user_uid, PostDataRules.internal_uid],
+            [user_roles, PostDataRules.required_name],
+        ])
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "input validation failed"
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        cluster_uid = long(cluster_uid)
+        user_uid = long(user_uid)
+        try:
+            existings_keys = [
+                ndb.Key(Datastores.cluster._get_kind(), cluster_uid),
+                ndb.Key(Datastores.users._get_kind(), user_uid),
+            ]
+        except Exception as exc:
+            return_msg += str(exc)
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        for existing_key in existings_keys:
+            call_result = DSF.kget(existing_key)
+            debug_data.append(call_result)
+            if call_result['success'] != RC.success:
+                return_msg += "Datastore access failed"
+                return {
+                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            if not call_result['get_result']:
+                return_msg += "{} not found".format(existing_key.kind())
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+        # </end> verify input data
+
+        parent_key = ndb.Key(Datastores.cluster._get_kind(), cluster_uid)
+        key_name = "{}|{}".format(user_uid, cluster_uid)
+        joins = Datastores.cluster_joins(id=key_name, parent=parent_key)
+        joins.user_uid = unicode(user_uid)
+        joins.cluster_uid = unicode(cluster_uid)
+        joins.roles = user_roles
+        call_result = joins.kput()
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to write needer_need_joins to datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
+        task_results['uid'] = call_result['put_result'].id()
+
+        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+
 class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
     def processPushTask(self):
         task_id = "modify-joins:AddModifyNeedToNeeder:processPushTask"
@@ -146,4 +226,5 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
 
 app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_need_to_needer.url, AddModifyNeedToNeeder),
+    (Services.modify_joins.add_modify_cluster_user.url, AddModifyClusterUser),
 ], debug=True)
