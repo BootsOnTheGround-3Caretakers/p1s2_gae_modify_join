@@ -94,17 +94,11 @@ class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
 
         cluster_uid = long(cluster_uid)
         user_uid = long(user_uid)
-        try:
-            existings_keys = [
-                ndb.Key(Datastores.cluster._get_kind(), cluster_uid),
-                ndb.Key(Datastores.users._get_kind(), user_uid),
-            ]
-        except Exception as exc:
-            return_msg += str(exc)
-            return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
-                'task_results': task_results,
-            }
+
+        existings_keys = [
+            ndb.Key(Datastores.cluster._get_kind(), cluster_uid),
+            ndb.Key(Datastores.users._get_kind(), user_uid),
+        ]
 
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
@@ -173,17 +167,11 @@ class RemoveUserFromCluster(webapp2.RequestHandler, CommonPostHandler):
         transaction_user_uid = long(transaction_user_uid)
         cluster_uid = long(cluster_uid)
         user_uid = long(user_uid)
-        try:
-            existings_keys = [
-                ndb.Key(Datastores.cluster._get_kind(), cluster_uid),
-                ndb.Key(Datastores.users._get_kind(), user_uid),
-            ]
-        except Exception as exc:
-            return_msg += str(exc)
-            return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
-                'task_results': task_results,
-            }
+
+        existings_keys = [
+            ndb.Key(Datastores.cluster._get_kind(), cluster_uid),
+            ndb.Key(Datastores.users._get_kind(), user_uid),
+        ]
 
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
@@ -249,17 +237,11 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
 
         user_uid = long(user_uid)
         skill_uid = long(skill_uid)
-        try:
-            existings_keys = [
-                ndb.Key(Datastores.users._get_kind(), user_uid),
-                ndb.Key(Datastores.caretaker_skills._get_kind(), skill_uid),
-            ]
-        except Exception as exc:
-            return_msg += str(exc)
-            return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
-                'task_results': task_results,
-            }
+
+        existings_keys = [
+            ndb.Key(Datastores.users._get_kind(), user_uid),
+            ndb.Key(Datastores.caretaker_skills._get_kind(), skill_uid),
+        ]
 
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
@@ -329,18 +311,15 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
                 'task_results': task_results,
             }
 
-        try:
-            existings_keys = [
-                ndb.Key(Datastores.needer._get_kind(), long(needer_uid)),
-                ndb.Key(Datastores.needs._get_kind(), long(need_uid)),
-                ndb.Key(Datastores.users._get_kind(), long(user_uid)),
-            ]
-        except Exception as exc:
-            return_msg += str(exc)
-            return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
-                'task_results': task_results,
-            }
+        needer_uid = long(needer_uid)
+        need_uid = long(need_uid)
+        user_uid = long(user_uid)
+
+        existings_keys = [
+            ndb.Key(Datastores.needer._get_kind(), needer_uid),
+            ndb.Key(Datastores.needs._get_kind(), need_uid),
+            ndb.Key(Datastores.users._get_kind(), user_uid),
+        ]
 
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
@@ -359,11 +338,12 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
                 }
         # </end> verify input data
 
-        key_name = "{}|{}".format(needer_uid, needer_uid)
-        joins = Datastores.needer_needs_joins(id=key_name)
-        joins.needer_uid = needer_uid
-        joins.need_uid = need_uid
-        joins.user_uid = user_uid
+        parent_key = ndb.Key(Datastores.users._get_kind(), user_uid, Datastores.needer._get_kind(), needer_uid)
+        key_name = "{}|{}".format(needer_uid, need_uid)
+        joins = Datastores.needer_needs_joins(id=key_name, parent=parent_key)
+        joins.needer_uid = unicode(needer_uid)
+        joins.need_uid = unicode(need_uid)
+        joins.user_uid = unicode(user_uid)
         joins.special_requests = special_requirements
         call_result = joins.kput()
         debug_data.append(call_result)
@@ -379,9 +359,84 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
         return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
 
 
+class RemoveNeedFromNeeder(webapp2.RequestHandler, CommonPostHandler):
+    def processPushTask(self):
+        task_id = "modify-joins:RemoveNeedFromNeeder:processPushTask"
+        return_msg = task_id + ": "
+        debug_data = []
+        task_results = {}
+
+        # verify input data
+        transaction_id = unicode(self.request.get("transaction_id", ""))
+        transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
+        need_uid = unicode(self.request.get(TaskArguments.s2t5_need_uid, ""))
+        needer_uid = unicode(self.request.get(TaskArguments.s2t5_needer_uid, ""))
+        user_uid = unicode(self.request.get(TaskArguments.s2t5_user_uid, ""))
+
+        call_result = self.ruleCheck([
+            [transaction_id, PostDataRules.required_name],
+            [transaction_user_uid, PostDataRules.internal_uid],
+            [need_uid, PostDataRules.internal_uid],
+            [needer_uid, PostDataRules.internal_uid],
+            [user_uid, PostDataRules.internal_uid],
+        ])
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "input validation failed"
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        transaction_user_uid = long(transaction_user_uid)
+        needer_uid = long(needer_uid)
+        need_uid = long(need_uid)
+        user_uid = long(user_uid)
+
+        existings_keys = [
+            ndb.Key(Datastores.needer._get_kind(), needer_uid),
+            ndb.Key(Datastores.needs._get_kind(), need_uid),
+            ndb.Key(Datastores.users._get_kind(), user_uid),
+        ]
+
+        for existing_key in existings_keys:
+            call_result = DSF.kget(existing_key)
+            debug_data.append(call_result)
+            if call_result['success'] != RC.success:
+                return_msg += "Datastore access failed"
+                return {
+                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            if not call_result['get_result']:
+                return_msg += "{} not found".format(existing_key.kind())
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+        # </end> verify input data
+
+        key = ndb.Key(
+            Datastores.users._get_kind(), user_uid,
+            Datastores.needer._get_kind(), needer_uid,
+            Datastores.needer_needs_joins._get_kind(), "{}|{}".format(needer_uid, need_uid)
+        )
+        call_result = DSF.kdelete(transaction_user_uid, key)
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to delete needer_need_joins from datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
+        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+
 app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_cluster_user.url, AddModifyClusterUser),
     (Services.modify_joins.remove_user_from_cluster.url, RemoveUserFromCluster),
     (Services.modify_joins.add_modify_user_skill.url, AddModifyUserSkill),
     (Services.modify_joins.add_modify_need_to_needer.url, AddModifyNeedToNeeder),
+    (Services.modify_joins.remove_need_from_needer.url, RemoveNeedFromNeeder),
 ], debug=True)
