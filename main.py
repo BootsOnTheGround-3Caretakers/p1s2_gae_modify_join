@@ -263,7 +263,7 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
         parent_key = ndb.Key(Datastores.cluster._get_kind(), user_uid)
         key_name = "{}|{}".format(user_uid, skill_uid)
         joins = Datastores.caretaker_skills_joins(id=key_name, parent=parent_key)
-        joins.user_uid = unicode(user_uid)
+        joins.user_uid = user_uid
         joins.skill_uid = unicode(skill_uid)
         joins.special_notes = special_notes
         call_result = joins.kput()
@@ -502,6 +502,75 @@ class RemoveNeederFromUser(webapp2.RequestHandler, CommonPostHandler):
         return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
 
 
+class AssignHashtagToUser(webapp2.RequestHandler, CommonPostHandler):
+    def processPushTask(self):
+        task_id = "modify-joins:AssignHashtagToUser:processPushTask"
+        return_msg = task_id + ": "
+        debug_data = []
+        task_results = {}
+
+        # verify input data
+        transaction_id = unicode(self.request.get("transaction_id", ""))
+        transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
+        user_uid = unicode(self.request.get(TaskArguments.s2t7_user_uid, ""))
+        hashtag_uid = unicode(self.request.get(TaskArguments.s2t7_hashtag_uid, ""))
+
+        call_result = self.ruleCheck([
+            [transaction_id, PostDataRules.required_name],
+            [transaction_user_uid, PostDataRules.internal_uid],
+            [user_uid, PostDataRules.internal_uid],
+            [hashtag_uid, PostDataRules.internal_uid],
+        ])
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "input validation failed"
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        user_uid = long(user_uid)
+        hashtaguid = long(hashtag_uid)
+
+        existings_keys = [
+            ndb.Key(Datastores.users._get_kind(), user_uid),
+            ndb.Key(Datastores.hashtags._get_kind(), hashtag_uid),
+        ]
+
+        for existing_key in existings_keys:
+            call_result = DSF.kget(existing_key)
+            debug_data.append(call_result)
+            if call_result['success'] != RC.success:
+                return_msg += "Datastore access failed"
+                return {
+                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            if not call_result['get_result']:
+                return_msg += "{} not found".format(existing_key.kind())
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+        # </end> verify input data
+
+        parent_key = ndb.Key(Datastores.users._get_kind(), user_uid)
+        pointer = Datastores.hashtag_pointer(id=hashtag_uid, parent=parent_key)
+        pointer.hashtag_uid = hashtag_uid
+        call_result = pointer.kput()
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to write hashtag_pointer to datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
+        task_results['uid'] = call_result['put_result'].id()
+
+        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+
 app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_cluster_user.url, AddModifyClusterUser),
     (Services.modify_joins.remove_user_from_cluster.url, RemoveUserFromCluster),
@@ -509,4 +578,5 @@ app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_need_to_needer.url, AddModifyNeedToNeeder),
     (Services.modify_joins.remove_need_from_needer.url, RemoveNeedFromNeeder),
     (Services.modify_joins.remove_needer_from_user.url, RemoveNeederFromUser),
+    (Services.modify_joins.assign_hashtag_to_user.url, AssignHashtagToUser),
 ], debug=True)
