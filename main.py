@@ -264,7 +264,7 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
         key_name = "{}|{}".format(user_uid, skill_uid)
         joins = Datastores.caretaker_skills_joins(id=key_name, parent=parent_key)
         joins.user_uid = user_uid
-        joins.skill_uid = unicode(skill_uid)
+        joins.skill_uid = skill_uid
         joins.special_notes = special_notes
         call_result = joins.kput()
         debug_data.append(call_result)
