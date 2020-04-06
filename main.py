@@ -206,6 +206,12 @@ class RemoveUserFromCluster(webapp2.RequestHandler, CommonPostHandler):
             return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
 
         cluster_join.replicateEntityToFirebase(delete_flag=True)
+        if call_result['success'] != RC.success:
+            return_msg += "firebase deletion replication failed"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
 
         call_result = DSF.kdelete(transaction_user_uid, key)
         debug_data.append(call_result)
@@ -434,6 +440,27 @@ class RemoveNeedFromNeeder(webapp2.RequestHandler, CommonPostHandler):
             Datastores.needer._get_kind(), needer_uid,
             Datastores.needer_needs_joins._get_kind(), "{}|{}".format(needer_uid, need_uid)
         )
+
+        call_result = DSF.kget(key)
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to get needer_need_joins from datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+        entity = call_result['get_result']
+        if not entity:
+            return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+        entity.replicateEntityToFirebase(delete_flag=True)
+        if call_result['success'] != RC.success:
+            return_msg += "firebase deletion replication failed"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
         call_result = DSF.kdelete(transaction_user_uid, key)
         debug_data.append(call_result)
         if call_result['success'] != RC.success:
@@ -503,6 +530,27 @@ class RemoveNeederFromUser(webapp2.RequestHandler, CommonPostHandler):
             Datastores.users._get_kind(), user_uid,
             Datastores.needer._get_kind(), needer_uid
         )
+
+        call_result = DSF.kget(key)
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to load needer from datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+        entity = call_result['get_result']
+        if not entity:
+            return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+        entity.replicateEntityToFirebase(delete_flag=True)
+        if call_result['success'] != RC.success:
+            return_msg += "firebase deletion replication failed"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
         call_result = DSF.kdelete(transaction_user_uid, key)
         debug_data.append(call_result)
         if call_result['success'] != RC.success:
