@@ -39,13 +39,11 @@ class CommonPostHandler(DataValidation):
                 self.request.get('transaction_user_uid', None)
             )
             task_functions.logTransactionFailed(self.request.get('transaction_id', None), call_result['success'])
-            if call_result['success'] == RC.failed_retry:
+            if call_result['success'] < RC.retry_threshold:
                 self.response.set_status(500)
-            if call_result['success'] == RC.input_validation_failed:
-                self.response.set_status(400)
-            if call_result['success'] == RC.ACL_check_failed:
-                self.response.set_status(401)
-
+            else:
+                #any other failure scenario will continue to fail no matter how many times its called.
+                self.response.set_status(200)
             return
 
         # go to the next function
