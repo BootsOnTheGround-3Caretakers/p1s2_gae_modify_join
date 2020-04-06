@@ -238,6 +238,7 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
         user_uid = unicode(self.request.get(TaskArguments.s2t3_user_uid, ""))
         skill_uid = unicode(self.request.get(TaskArguments.s2t3_skill_uid, ""))
         special_notes = unicode(self.request.get(TaskArguments.s2t3_special_notes, "")) or None
+        total_capacity = unicode(self.request.get(TaskArguments.s2t3_total_capacity, "1"))
 
         call_result = self.ruleCheck([
             [transaction_id, PostDataRules.required_name],
@@ -256,6 +257,7 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
 
         user_uid = long(user_uid)
         skill_uid = long(skill_uid)
+        total_capacity = int(total_capacity)
 
         existings_keys = [
             ndb.Key(Datastores.users._get_kind(), user_uid),
@@ -279,12 +281,13 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
                 }
         # </end> verify input data
 
-        parent_key = ndb.Key(Datastores.cluster._get_kind(), user_uid)
+        parent_key = ndb.Key(Datastores.users._get_kind(), user_uid)
         key_name = "{}|{}".format(user_uid, skill_uid)
         joins = Datastores.caretaker_skills_joins(id=key_name, parent=parent_key)
         joins.user_uid = user_uid
         joins.skill_uid = skill_uid
         joins.special_notes = special_notes
+        joins.total_capacity = total_capacity
         call_result = joins.kput()
         debug_data.append(call_result)
         if call_result['success'] != RC.success:
