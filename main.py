@@ -145,8 +145,8 @@ class RemoveUserFromCluster(webapp2.RequestHandler, CommonPostHandler):
         # verify input data
         transaction_id = unicode(self.request.get("transaction_id", ""))
         transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
-        cluster_uid = unicode(self.request.get(TaskArguments.s2t1_cluster_uid, ""))
-        user_uid = unicode(self.request.get(TaskArguments.s2t1_user_uid, ""))
+        cluster_uid = unicode(self.request.get(TaskArguments.s2t2_cluster_uid, ""))
+        user_uid = unicode(self.request.get(TaskArguments.s2t2_user_uid, ""))
 
         call_result = self.ruleCheck([
             [transaction_id, PostDataRules.required_name],
@@ -192,6 +192,21 @@ class RemoveUserFromCluster(webapp2.RequestHandler, CommonPostHandler):
             Datastores.cluster._get_kind(), cluster_uid,
             Datastores.cluster_joins._get_kind(), "{}|{}".format(user_uid, cluster_uid)
         )
+
+        call_result = DSF.kget(key)
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to load cluster_joins from datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+        cluster_join = call_result['get_result']
+        if not cluster_join:
+            return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+        cluster_join.replicateEntityToFirebase(delete_flag=True)
+
         call_result = DSF.kdelete(transaction_user_uid, key)
         debug_data.append(call_result)
         if call_result['success'] != RC.success:
