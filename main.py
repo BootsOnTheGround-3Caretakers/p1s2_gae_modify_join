@@ -311,9 +311,9 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
         call_result = self.ruleCheck([
             [transaction_id, PostDataRules.required_name],
             [transaction_user_uid, PostDataRules.internal_uid],
-            [need_uid, Datastores.needer_needs_joins._rule_need_uid],
-            [needer_uid, Datastores.needer_needs_joins._rule_needer_uid],
-            [user_uid, Datastores.needer_needs_joins._rule_user_uid],
+            [need_uid, PostDataRules.internal_uid],
+            [needer_uid, PostDataRules.internal_uid],
+            [user_uid, PostDataRules.internal_uid],
             [special_requirements, Datastores.needer_needs_joins._rule_special_requests],
         ])
         debug_data.append(call_result)
