@@ -118,8 +118,8 @@ class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
         parent_key = ndb.Key(Datastores.cluster._get_kind(), cluster_uid)
         key_name = "{}|{}".format(user_uid, cluster_uid)
         joins = Datastores.cluster_joins(id=key_name, parent=parent_key)
-        joins.user_uid = unicode(user_uid)
-        joins.cluster_uid = unicode(cluster_uid)
+        joins.user_uid = user_uid
+        joins.cluster_uid = cluster_uid
         joins.roles = user_roles
         call_result = joins.kput()
         debug_data.append(call_result)
@@ -354,9 +354,9 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
         parent_key = ndb.Key(Datastores.users._get_kind(), user_uid, Datastores.needer._get_kind(), needer_uid)
         key_name = "{}|{}".format(needer_uid, need_uid)
         joins = Datastores.needer_needs_joins(id=key_name, parent=parent_key)
-        joins.needer_uid = unicode(needer_uid)
-        joins.need_uid = unicode(need_uid)
-        joins.user_uid = unicode(user_uid)
+        joins.needer_uid = needer_uid
+        joins.need_uid = need_uid
+        joins.user_uid = user_uid
         joins.special_requests = special_requirements
         call_result = joins.kput()
         debug_data.append(call_result)
