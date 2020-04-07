@@ -770,6 +770,173 @@ class RemoveSkillFromUser(webapp2.RequestHandler, CommonPostHandler):
         return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
 
 
+class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
+    def processPushTask(self):
+        task_id = "modify-joins:ModifyUserInformation:processPushTask"
+        return_msg = task_id + ": "
+        debug_data = []
+        task_results = {}
+
+        # verify input data
+        transaction_id = unicode(self.request.get("transaction_id", ""))
+        transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
+        user_uid = unicode(self.request.get(TaskArguments.s2t10_user_uid, ""))
+        first_name = unicode(self.request.get(TaskArguments.s2t10_first_name, "")) or None
+        last_name = unicode(self.request.get(TaskArguments.s2t10_last_name, "")) or None
+        phone_number = unicode(self.request.get(TaskArguments.s2t10_phone_number, "")) or None
+        phone_texts = unicode(self.request.get(TaskArguments.s2t10_phone_texts, "")) or None
+        phone_2 = unicode(self.request.get(TaskArguments.s2t10_phone_2, "")) or None
+        emergency_contact = unicode(self.request.get(TaskArguments.s2t10_emergency_contact, "")) or None
+        home_address = unicode(self.request.get(TaskArguments.s2t10_home_address, "")) or None
+        email_address = unicode(self.request.get(TaskArguments.s2t10_email_address, "")) or None
+        firebase_uid = unicode(self.request.get(TaskArguments.s2t10_firebase_uid, "")) or None
+        country_uid = unicode(self.request.get(TaskArguments.s2t10_country_uid, "")) or None
+        region_uid = unicode(self.request.get(TaskArguments.s2t10_region_uid, "")) or None
+        area_uid = unicode(self.request.get(TaskArguments.s2t10_area_uid, "")) or None
+        description = unicode(self.request.get(TaskArguments.s2t10_description, "")) or None
+        preferred_radius = unicode(self.request.get(TaskArguments.s2t10_preferred_radius, "")) or None
+        account_flags = unicode(self.request.get(TaskArguments.s2t10_account_flags, "")) or None
+        location_cord_lat = unicode(self.request.get(TaskArguments.s2t10_location_cord_lat, "")) or None
+        location_cord_long = unicode(self.request.get(TaskArguments.s2t10_location_cord_long, "")) or None
+
+        call_result = self.ruleCheck([
+            [transaction_id, PostDataRules.required_name],
+            [transaction_user_uid, PostDataRules.internal_uid],
+            [user_uid, PostDataRules.internal_uid],
+            [first_name, PostDataRules.optional_name],
+            [last_name, PostDataRules.optional_name],
+            [phone_number, PostDataRules.optional_name],
+            [phone_texts, Datastores.users._rule_phone_texts],
+            [phone_2, PostDataRules.optional_name],
+            [emergency_contact, Datastores.users._rule_emergency_contact],
+            [home_address, Datastores.users._rule_home_address],
+            [email_address, Datastores.users._rule_email_address],
+            [firebase_uid, Datastores.users._rule_firebase_uid],
+            [country_uid, Datastores.users._rule_country_uid],
+            [region_uid, Datastores.users._rule_region_uid],
+            [area_uid, Datastores.users._rule_area_uid],
+            [description, Datastores.users._rule_description],
+            [preferred_radius, PostDataRules.optional_number],
+            [account_flags, Datastores.users._rule_account_flags],
+            [location_cord_lat, PostDataRules.optional_name],
+            [location_cord_long, PostDataRules.optional_name],
+        ])
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "input validation failed"
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        transaction_user_uid = long(transaction_user_uid)
+        user_uid = long(user_uid)
+
+        location_coord = None
+        if location_cord_lat and location_cord_long:
+            try:
+                location_cord_lat = float(location_cord_lat)
+            except ValueError as exc:
+                return_msg += unicode(exc)
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            try:
+                location_cord_long = float(location_cord_long)
+            except ValueError as exc:
+                return_msg += unicode(exc)
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            if not ((-90 <= location_cord_lat <= 90) and (-180 <= location_cord_long <= 180)):
+                return_msg += "latitude value must be [-90, 90], longitude value must be [-180, 180]"
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            location_coord = ndb.GeoPt(location_cord_lat, location_cord_long)
+        elif location_cord_lat or location_cord_long:
+            return_msg += "Incomplete location information. latitude: {}, longitude: {}".format(location_cord_lat, location_cord_long)
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        user_key = ndb.Key(Datastores.users._get_kind(), user_uid)
+        call_result = DSF.kget(user_key)
+        if call_result['success'] != RC.success:
+            return_msg += "Failed to load user from datastore"
+            return {
+                'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        if (not (email_address and firebase_uid)) and (email_address or firebase_uid):
+            return_msg += "Both email_address and firebase_uid must be specified when either one is specified."
+            return {
+                'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        user = call_result['get_result']
+        if not user:
+            return_msg += "User doesn't exist"
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        if phone_number and user.phone_1 != phone_number:
+            # check if there is another user having the same phone number
+            query = Datastores.users.query(Datastores.users.phone_1 == phone_number)
+            call_result = DSF.kfetch(query)
+            if call_result['success'] != RC.success:
+                return_msg += "fetch of users failed"
+                return {
+                    'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            users = call_result['fetch_result']
+            if users:
+                return_msg += "The specified phone_number has been used by another user"
+                return {
+                    'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            #</end> check if there is another user having the same phone number
+
+        # </end> verify input data
+
+        user.first_name = first_name or user.first_name
+        user.last_name = last_name or user.last_name
+        user.phone_1 = phone_number or user.phone_1
+        user.phone_texts = phone_texts or user.phone_texts
+        user.phone_2 = phone_2 or user.phone_2
+        user.emergency_contact = emergency_contact or user.emergency_contact
+        user.home_address = home_address or user.home_address
+        user.email_address = email_address or user.email_address
+        user.firebase_uid = firebase_uid or user.firebase_uid
+        user.country_uid = country_uid or user.country_uid
+        user.region_uid = region_uid or user.region_uid
+        user.area_uid = area_uid or user.area_uid
+        user.description = description or user.description
+        user.location_cords = location_coord or user.location_cords
+        user.preferred_radius = preferred_radius or user.preferred_radius
+        user.account_flags = account_flags or user.account_flags
+        call_result = user.kput()
+
+        if call_result['success'] != RC.success:
+            return_msg += "failed to update user on datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
+        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+
 app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_cluster_user.url, AddModifyClusterUser),
     (Services.modify_joins.remove_user_from_cluster.url, RemoveUserFromCluster),
@@ -780,4 +947,5 @@ app = webapp2.WSGIApplication([
     (Services.modify_joins.assign_hashtag_to_user.url, AssignHashtagToUser),
     (Services.modify_joins.remove_hashtag_from_user.url, RemoveHashtagFromUser),
     (Services.modify_joins.remove_skill_from_user.url, RemoveSkillFromUser),
+    (Services.modify_joins.modify_user_information.url, ModifyUserInformation),
 ], debug=True)
