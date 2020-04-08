@@ -926,7 +926,7 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
         user.preferred_radius = preferred_radius or user.preferred_radius
         user.account_flags = account_flags or user.account_flags
         call_result = user.kput()
-
+        debug_data.append(call_result)
         if call_result['success'] != RC.success:
             return_msg += "failed to update user on datastore"
             return {
