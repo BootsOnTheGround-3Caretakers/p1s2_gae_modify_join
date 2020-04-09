@@ -831,6 +831,7 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
 
         transaction_user_uid = long(transaction_user_uid)
         user_uid = long(user_uid)
+        preferred_radius = long(preferred_radius) if preferred_radius else None
 
         location_coord = None
         if location_cord_lat and location_cord_long:
