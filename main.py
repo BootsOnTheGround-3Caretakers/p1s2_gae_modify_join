@@ -937,6 +937,74 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
         return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
 
 
+class AssociateSkillWithNeed(webapp2.RequestHandler, CommonPostHandler):
+    def processPushTask(self):
+        task_id = "modify-joins:AssociateSkillWithNeed:processPushTask"
+        return_msg = task_id + ": "
+        debug_data = []
+        task_results = {}
+
+        # verify input data
+        transaction_id = unicode(self.request.get("transaction_id", ""))
+        transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
+        skill_uid = unicode(self.request.get(TaskArguments.s2t11_skill_uid, ""))
+        need_uid = unicode(self.request.get(TaskArguments.s2t11_need_uid, ""))
+
+        call_result = self.ruleCheck([
+            [transaction_id, PostDataRules.required_name],
+            [transaction_user_uid, PostDataRules.internal_uid],
+            [skill_uid, PostDataRules.internal_uid],
+            [need_uid, PostDataRules.internal_uid],
+        ])
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "input validation failed"
+            return {
+                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results,
+            }
+
+        skill_uid = long(skill_uid)
+        need_uid = long(need_uid)
+
+        existings_keys = [
+            ndb.Key(Datastores.caretaker_skills._get_kind(), skill_uid),
+            ndb.Key(Datastores.needs._get_kind(), need_uid),
+        ]
+
+        for existing_key in existings_keys:
+            call_result = DSF.kget(existing_key)
+            debug_data.append(call_result)
+            if call_result['success'] != RC.success:
+                return_msg += "Datastore access failed"
+                return {
+                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+            if not call_result['get_result']:
+                return_msg += "{} not found".format(existing_key.kind())
+                return {
+                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    'task_results': task_results,
+                }
+        # </end> verify input data
+
+        joins = Datastores.skills_satisfies_needs(id=skill_uid)
+        joins.need_uid = need_uid
+        call_result = joins.kput()
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to write skills_satisfies_needs to datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
+
+        task_results['uid'] = call_result['put_result'].id()
+
+        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+
+
 app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_cluster_user.url, AddModifyClusterUser),
     (Services.modify_joins.remove_user_from_cluster.url, RemoveUserFromCluster),
@@ -948,4 +1016,5 @@ app = webapp2.WSGIApplication([
     (Services.modify_joins.remove_hashtag_from_user.url, RemoveHashtagFromUser),
     (Services.modify_joins.remove_skill_from_user.url, RemoveSkillFromUser),
     (Services.modify_joins.modify_user_information.url, ModifyUserInformation),
+    (Services.modify_joins.associate_skill_with_need.url, AssociateSkillWithNeed),
 ], debug=True)
