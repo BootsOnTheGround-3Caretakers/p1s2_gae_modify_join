@@ -810,6 +810,7 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
         account_flags = unicode(self.request.get(TaskArguments.s2t10_account_flags, "")) or None
         location_cord_lat = unicode(self.request.get(TaskArguments.s2t10_location_cord_lat, "")) or None
         location_cord_long = unicode(self.request.get(TaskArguments.s2t10_location_cord_long, "")) or None
+        gender = unicode(self.request.get(TaskArguments.s2t10_gender, "")) or None
 
         call_result = self.ruleCheck([
             [transaction_id, PostDataRules.required_name],
@@ -832,6 +833,7 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
             [account_flags, Datastores.users._rule_account_flags],
             [location_cord_lat, PostDataRules.optional_name],
             [location_cord_long, PostDataRules.optional_name],
+            [gender, PostDataRules.optional_name],
         ])
         debug_data.append(call_result)
         if call_result['success'] != RC.success:
@@ -939,6 +941,7 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
         user.location_cords = location_coord or user.location_cords
         user.preferred_radius = preferred_radius or user.preferred_radius
         user.account_flags = account_flags or user.account_flags
+        user.gender = gender or user.gender
         call_result = user.kput()
         debug_data.append(call_result)
         if call_result['success'] != RC.success:
