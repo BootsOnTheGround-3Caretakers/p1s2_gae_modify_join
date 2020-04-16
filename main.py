@@ -92,10 +92,11 @@ class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
 
         cluster_uid = long(cluster_uid)
         user_uid = long(user_uid)
+        user_key = ndb.Key(Datastores.users._get_kind(), user_uid)
 
         existings_keys = [
             ndb.Key(Datastores.cluster._get_kind(), cluster_uid),
-            ndb.Key(Datastores.users._get_kind(), user_uid),
+            user_key,
         ]
 
         for existing_key in existings_keys:
@@ -124,13 +125,24 @@ class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
         call_result = joins.kput()
         debug_data.append(call_result)
         if call_result['success'] != RC.success:
-            return_msg += "failed to write needer_need_joins to datastore"
+            return_msg += "failed to write cluster_joins to datastore"
             return {
                 'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
                 'task_results': task_results
             }
 
         task_results['uid'] = call_result['put_result'].id()
+
+        cluster_pointer = Datastores.cluster_pointer(parent=user_key)
+        cluster_pointer.cluster_uid = cluster_uid
+        call_result = cluster_pointer.kput()
+        debug_data.append(call_result)
+        if call_result['success'] != RC.success:
+            return_msg += "failed to write cluster_pointer to datastore"
+            return {
+                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                'task_results': task_results
+            }
 
         return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
 
