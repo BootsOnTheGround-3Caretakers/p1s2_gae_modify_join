@@ -961,6 +961,39 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
 
         # </end> verify input data
 
+        skill_joins = []
+        new_country_uid = country_uid or user.country_uid
+        new_region_uid = region_uid or user.region_uid
+        new_area_uid = area_uid or user.area_uid
+        if (
+                # user currently has a complete area info
+                user.country_uid and user.region_uid and user.area_uid and
+
+                # and there's part of area info to be changed
+                (new_country_uid != user.country_uid or new_region_uid != user.region_uid or new_area_uid != user.area_uid)
+        ):
+            # remove old skills_search_data on firebase
+            query = Datastores.caretaker_skills_joins.query(ancestor=user_key)
+            call_result = DSF.kfetch(query)
+            debug_data.append(call_result)
+            if call_result[RDK.success] != RC.success:
+                return_msg += "failed to load skill_joins from datastore"
+                return {
+                    RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                    'task_results': task_results,
+                }
+            skill_joins = call_result['fetch_result']
+            for skill_join in skill_joins:
+                call_result = skill_join.replicateEntityToFirebase(delete_flag=True)
+                debug_data.append(call_result)
+                if call_result[RDK.success] != RC.success:
+                    return_msg += "firebase deletion replication failed"
+                    return {
+                        RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                        'task_results': task_results
+                    }
+            #</end> remove old skills_search_data on firebase
+
         user.first_name = first_name or user.first_name
         user.last_name = last_name or user.last_name
         user.phone_1 = phone_number or user.phone_1
@@ -970,9 +1003,9 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
         user.home_address = home_address or user.home_address
         user.email_address = email_address or user.email_address
         user.firebase_uid = firebase_uid or user.firebase_uid
-        user.country_uid = country_uid or user.country_uid
-        user.region_uid = region_uid or user.region_uid
-        user.area_uid = area_uid or user.area_uid
+        user.country_uid = new_country_uid
+        user.region_uid = new_region_uid
+        user.area_uid = new_area_uid
         user.description = description or user.description
         user.location_cords = location_coord or user.location_cords
         user.preferred_radius = preferred_radius or user.preferred_radius
@@ -998,6 +1031,18 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
                     RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results
                 }
+
+        # update user skill search data
+        for skill_join in skill_joins:
+            call_result = skill_join.replicateEntityToFirebase()
+            debug_data.append(call_result)
+            if call_result[RDK.success] != RC.success:
+                return_msg += "firebase replication failed"
+                return {
+                    RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                    'task_results': task_results
+                }
+        #</end> update user skill search data
 
         return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
