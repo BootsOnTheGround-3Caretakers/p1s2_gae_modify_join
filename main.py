@@ -16,6 +16,7 @@ from p1_services import Services, TaskArguments
 from p1_global_settings import PostDataRules
 from p1_datastores import Datastores
 from datastore_functions import DatastoreFunctions as DSF
+from error_handling import RDK
 
 
 class CommonPostHandler(DataValidation):
@@ -31,15 +32,15 @@ class CommonPostHandler(DataValidation):
             params[key] = self.request.get(key, None)
         task_functions = TaskQueueFunctions()
 
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             task_functions.logError(
-                call_result['success'], task_id, params,
+                call_result[RDK.success], task_id, params,
                 self.request.get('X-AppEngine-TaskName', None),
-                self.request.get('transaction_id', None), call_result['return_msg'], debug_data,
+                self.request.get('transaction_id', None), call_result[RDK.return_msg], debug_data,
                 self.request.get('transaction_user_uid', None)
             )
-            task_functions.logTransactionFailed(self.request.get('transaction_id', None), call_result['success'])
-            if call_result['success'] < RC.retry_threshold:
+            task_functions.logTransactionFailed(self.request.get('transaction_id', None), call_result[RDK.success])
+            if call_result[RDK.success] < RC.retry_threshold:
                 self.response.set_status(500)
             else:
                 #any other failure scenario will continue to fail no matter how many times its called.
@@ -50,11 +51,11 @@ class CommonPostHandler(DataValidation):
         task_functions = TaskQueueFunctions()
         call_result = task_functions.nextTask(task_id, task_results, params)
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             task_functions.logError(
-                call_result['success'], task_id, params,
+                call_result[RDK.success], task_id, params,
                 self.request.get('X-AppEngine-TaskName', None),
-                self.request.get('transaction_id', None), call_result['return_msg'], debug_data,
+                self.request.get('transaction_id', None), call_result[RDK.return_msg], debug_data,
                 self.request.get('transaction_user_uid', None)
             )
         # </end> go to the next function
@@ -83,10 +84,10 @@ class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
             [user_roles, PostDataRules.required_name],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -102,16 +103,16 @@ class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -124,10 +125,10 @@ class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
         joins.roles = user_roles
         call_result = joins.kput()
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to write cluster_joins to datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
@@ -137,14 +138,14 @@ class AddModifyClusterUser(webapp2.RequestHandler, CommonPostHandler):
         cluster_pointer.cluster_uid = cluster_uid
         call_result = cluster_pointer.kput()
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to write cluster_pointer to datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class RemoveUserFromCluster(webapp2.RequestHandler, CommonPostHandler):
@@ -167,10 +168,10 @@ class RemoveUserFromCluster(webapp2.RequestHandler, CommonPostHandler):
             [user_uid, PostDataRules.internal_uid],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -186,16 +187,16 @@ class RemoveUserFromCluster(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -207,34 +208,34 @@ class RemoveUserFromCluster(webapp2.RequestHandler, CommonPostHandler):
 
         call_result = DSF.kget(key)
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to load cluster_joins from datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
         cluster_join = call_result['get_result']
         if not cluster_join:
-            return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+            return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
         cluster_join.replicateEntityToFirebase(delete_flag=True)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "firebase deletion replication failed"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
         call_result = DSF.kdelete(transaction_user_uid, key)
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to delete cluster_joins from datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
@@ -260,10 +261,10 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
             [special_notes, Datastores.caretaker_skills_joins._rule_special_notes],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -279,16 +280,16 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -302,16 +303,16 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
         joins.total_capacity = total_capacity
         call_result = joins.kput()
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to write caretaker_skills_joins to datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
         task_results['uid'] = call_result['put_result'].id()
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
@@ -338,10 +339,10 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
             [special_requirements, Datastores.needer_needs_joins._rule_special_requests],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -358,16 +359,16 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -381,16 +382,16 @@ class AddModifyNeedToNeeder(webapp2.RequestHandler, CommonPostHandler):
         joins.special_requests = special_requirements
         call_result = joins.kput()
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to write needer_need_joins to datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
         task_results['uid'] = call_result['put_result'].id()
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class RemoveNeedFromNeeder(webapp2.RequestHandler, CommonPostHandler):
@@ -415,10 +416,10 @@ class RemoveNeedFromNeeder(webapp2.RequestHandler, CommonPostHandler):
             [user_uid, PostDataRules.internal_uid],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -436,16 +437,16 @@ class RemoveNeedFromNeeder(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -458,34 +459,34 @@ class RemoveNeedFromNeeder(webapp2.RequestHandler, CommonPostHandler):
 
         call_result = DSF.kget(key)
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to get needer_need_joins from datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
         entity = call_result['get_result']
         if not entity:
-            return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+            return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
         entity.replicateEntityToFirebase(delete_flag=True)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "firebase deletion replication failed"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
         call_result = DSF.kdelete(transaction_user_uid, key)
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to delete needer_need_joins from datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class RemoveNeederFromUser(webapp2.RequestHandler, CommonPostHandler):
@@ -508,10 +509,10 @@ class RemoveNeederFromUser(webapp2.RequestHandler, CommonPostHandler):
             [user_uid, PostDataRules.internal_uid],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -527,16 +528,16 @@ class RemoveNeederFromUser(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -548,34 +549,34 @@ class RemoveNeederFromUser(webapp2.RequestHandler, CommonPostHandler):
 
         call_result = DSF.kget(key)
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to load needer from datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
         entity = call_result['get_result']
         if not entity:
-            return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+            return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
         entity.replicateEntityToFirebase(delete_flag=True)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "firebase deletion replication failed"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
         call_result = DSF.kdelete(transaction_user_uid, key)
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to delete needer from datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class AssignHashtagToUser(webapp2.RequestHandler, CommonPostHandler):
@@ -598,10 +599,10 @@ class AssignHashtagToUser(webapp2.RequestHandler, CommonPostHandler):
             [hashtag_uid, PostDataRules.internal_uid],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -616,16 +617,16 @@ class AssignHashtagToUser(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -635,16 +636,16 @@ class AssignHashtagToUser(webapp2.RequestHandler, CommonPostHandler):
         pointer.hashtag_uid = hashtag_uid
         call_result = pointer.kput()
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to write hashtag_pointer to datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
         task_results['uid'] = call_result['put_result'].id()
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class RemoveHashtagFromUser(webapp2.RequestHandler, CommonPostHandler):
@@ -667,10 +668,10 @@ class RemoveHashtagFromUser(webapp2.RequestHandler, CommonPostHandler):
             [hashtag_uid, PostDataRules.internal_uid],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -686,31 +687,53 @@ class RemoveHashtagFromUser(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
 
         key = ndb.Key(Datastores.users._get_kind(), user_uid, Datastores.hashtag_pointer._get_kind(), hashtag_uid)
-        call_result = DSF.kdelete(transaction_user_uid, key)
-        debug_data.append(call_result)
-        if call_result['success'] != RC.success:
-            return_msg += "failed to delete hashtag_pointer from datastore"
+        call_result = DSF.kget(key)
+        if call_result[RDK.success] != RC.success:
+            return_msg += "failed to load hashtag_pointer from datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                'task_results': task_results
+            }
+        entity = call_result['get_result']
+        if not entity:
+            return_msg += "hashtag_pointer not found"
+            return {
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                'task_results': task_results
+            }
+        call_result = entity.replicateEntityToFirebase(delete_flag=True)
+        if call_result[RDK.success] != RC.success:
+            return_msg += "failed to delete hashtag_pointer on firebase"
+            return {
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        call_result = DSF.kdelete(transaction_user_uid, key)
+        debug_data.append(call_result)
+        if call_result[RDK.success] != RC.success:
+            return_msg += "failed to delete hashtag_pointer from datastore"
+            return {
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                'task_results': task_results
+            }
+
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class RemoveSkillFromUser(webapp2.RequestHandler, CommonPostHandler):
@@ -733,10 +756,10 @@ class RemoveSkillFromUser(webapp2.RequestHandler, CommonPostHandler):
             [skill_uid, PostDataRules.internal_uid],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -752,16 +775,16 @@ class RemoveSkillFromUser(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -772,14 +795,14 @@ class RemoveSkillFromUser(webapp2.RequestHandler, CommonPostHandler):
         )
         call_result = DSF.kdelete(transaction_user_uid, key)
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to delete caretaker_skills_joins from datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
@@ -836,10 +859,10 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
             [gender, PostDataRules.optional_name],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -854,7 +877,7 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
             except ValueError as exc:
                 return_msg += unicode(exc)
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             try:
@@ -862,36 +885,36 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
             except ValueError as exc:
                 return_msg += unicode(exc)
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not ((-90 <= location_cord_lat <= 90) and (-180 <= location_cord_long <= 180)):
                 return_msg += "latitude value must be [-90, 90], longitude value must be [-180, 180]"
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             location_coord = ndb.GeoPt(location_cord_lat, location_cord_long)
         elif location_cord_lat or location_cord_long:
             return_msg += "Incomplete location information. latitude: {}, longitude: {}".format(location_cord_lat, location_cord_long)
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
         user_key = ndb.Key(Datastores.users._get_kind(), user_uid)
         call_result = DSF.kget(user_key)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "Failed to load user from datastore"
             return {
-                'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
         if (not (email_address and firebase_uid)) and (email_address or firebase_uid):
             return_msg += "Both email_address and firebase_uid must be specified when either one is specified."
             return {
-                'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -899,7 +922,7 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
         if not user:
             return_msg += "User doesn't exist"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -908,17 +931,17 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
             key = ndb.Key(Datastores.phone_numbers._get_kind(), "{}|{}".format(country_uid, phone_number))
             call_result = DSF.kget(key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "failed to load phone_number from datastore"
                 return {
-                    'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             phone_number_entity = call_result['get_result']
             if phone_number_entity and phone_number_entity.user_uid != user_uid:
                 return_msg += "The specified phone_number has been used by another user"
                 return {
-                    'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             #</end> check if there is another user having the same phone number
@@ -944,10 +967,10 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
         user.gender = gender or user.gender
         call_result = user.kput()
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to update user on datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
@@ -956,14 +979,14 @@ class ModifyUserInformation(webapp2.RequestHandler, CommonPostHandler):
             phone_number_entity.user_uid = user_uid
             call_result = phone_number_entity.kput()
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "failed to write phone_number to datastore"
                 return {
-                    'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results
                 }
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 class AssociateSkillWithNeed(webapp2.RequestHandler, CommonPostHandler):
@@ -986,10 +1009,10 @@ class AssociateSkillWithNeed(webapp2.RequestHandler, CommonPostHandler):
             [need_uid, PostDataRules.internal_uid],
         ])
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "input validation failed"
             return {
-                'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results,
             }
 
@@ -1004,16 +1027,16 @@ class AssociateSkillWithNeed(webapp2.RequestHandler, CommonPostHandler):
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
-            if call_result['success'] != RC.success:
+            if call_result[RDK.success] != RC.success:
                 return_msg += "Datastore access failed"
                 return {
-                    'success': RC.datastore_failure, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
             if not call_result['get_result']:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
-                    'success': RC.input_validation_failed, 'return_msg': return_msg, 'debug_data': debug_data,
+                    RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
         # </end> verify input data
@@ -1022,16 +1045,16 @@ class AssociateSkillWithNeed(webapp2.RequestHandler, CommonPostHandler):
         joins.need_uid = need_uid
         call_result = joins.kput()
         debug_data.append(call_result)
-        if call_result['success'] != RC.success:
+        if call_result[RDK.success] != RC.success:
             return_msg += "failed to write skills_satisfies_needs to datastore"
             return {
-                'success': call_result['success'], 'return_msg': return_msg, 'debug_data': debug_data,
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                 'task_results': task_results
             }
 
         task_results['uid'] = call_result['put_result'].id()
 
-        return {'success': RC.success, 'return_msg': return_msg, 'debug_data': debug_data, 'task_results': task_results}
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
 app = webapp2.WSGIApplication([
