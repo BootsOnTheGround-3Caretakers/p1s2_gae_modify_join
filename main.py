@@ -251,7 +251,7 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
         user_uid = unicode(self.request.get(TaskArguments.s2t3_user_uid, ""))
         skill_uid = unicode(self.request.get(TaskArguments.s2t3_skill_uid, ""))
         special_notes = unicode(self.request.get(TaskArguments.s2t3_special_notes, "")) or None
-        total_capacity = unicode(self.request.get(TaskArguments.s2t3_total_capacity, "1"))
+        total_capacity = unicode(self.request.get(TaskArguments.s2t3_total_capacity))
 
         call_result = self.ruleCheck([
             [transaction_id, PostDataRules.required_name],
@@ -259,6 +259,7 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
             [user_uid, PostDataRules.internal_uid],
             [skill_uid, PostDataRules.internal_uid],
             [special_notes, Datastores.caretaker_skills_joins._rule_special_notes],
+            [total_capacity, PostDataRules.positive_number],
         ])
         debug_data.append(call_result)
         if call_result[RDK.success] != RC.success:
@@ -271,12 +272,15 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
         user_uid = long(user_uid)
         skill_uid = long(skill_uid)
         total_capacity = int(total_capacity)
+        user_key = ndb.Key(Datastores.users._get_kind(), user_uid)
+        skill_key = ndb.Key(Datastores.caretaker_skills._get_kind(), skill_uid)
 
         existings_keys = [
-            ndb.Key(Datastores.users._get_kind(), user_uid),
-            ndb.Key(Datastores.caretaker_skills._get_kind(), skill_uid),
+            user_key,
+            skill_key,
         ]
 
+        existing_entities = []
         for existing_key in existings_keys:
             call_result = DSF.kget(existing_key)
             debug_data.append(call_result)
@@ -286,17 +290,26 @@ class AddModifyUserSkill(webapp2.RequestHandler, CommonPostHandler):
                     RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
-            if not call_result['get_result']:
+            entity = call_result['get_result']
+            if not entity:
                 return_msg += "{} not found".format(existing_key.kind())
                 return {
                     RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
                     'task_results': task_results,
                 }
+            existing_entities.append(entity)
+
+        user = existing_entities[0]
+        if not (user.country_uid and user.region_uid and user.area_uid):
+            return_msg += "country_uid, region_uid, or area_uid of the user not set yet."
+            return {
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                'task_results': task_results
+            }
         # </end> verify input data
 
-        parent_key = ndb.Key(Datastores.users._get_kind(), user_uid)
         key_name = "{}|{}".format(user_uid, skill_uid)
-        joins = Datastores.caretaker_skills_joins(id=key_name, parent=parent_key)
+        joins = Datastores.caretaker_skills_joins(id=key_name, parent=user_key)
         joins.user_uid = user_uid
         joins.skill_uid = skill_uid
         joins.special_notes = special_notes
