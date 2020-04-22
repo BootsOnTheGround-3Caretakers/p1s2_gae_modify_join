@@ -12,5 +12,7 @@ gcloud -q --project=$PROJECT tasks queues create p1s2t7-assign-hashtag-to-user
 gcloud -q --project=$PROJECT tasks queues create p1s2t8-remove-hashtag-from-user
 gcloud -q --project=$PROJECT tasks queues create p1s2t9-remove-skill-from-user
 gcloud -q --project=$PROJECT tasks queues create p1s2t10-modify-user-information
+gcloud -q --project=$PROJECT tasks queues create p1s2t11-associate-skill-with-need
+gcloud -q --project=$PROJECT tasks queues create p1s2t12-modify-needer
 
 gcloud -q --project=$PROJECT app deploy --version 1 3>> upload_log.txt

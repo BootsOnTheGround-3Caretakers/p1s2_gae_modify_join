@@ -1115,6 +1115,74 @@ class AssociateSkillWithNeed(webapp2.RequestHandler, CommonPostHandler):
         return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
 
 
+class ModifyNeeder(webapp2.RequestHandler, CommonPostHandler):
+    def processPushTask(self):
+        task_id = "modify-joins:ModifyNeeder:processPushTask"
+        return_msg = task_id + ": "
+        debug_data = []
+        task_results = {}
+
+        # verify input data
+        transaction_id = unicode(self.request.get("transaction_id", ""))
+        transaction_user_uid = unicode(self.request.get("transaction_user_uid", ""))
+        user_uid = unicode(self.request.get(TaskArguments.s2t12_user_uid, ""))
+        needer_uid = unicode(self.request.get(TaskArguments.s2t12_needer_uid, ""))
+        private_metadata = unicode(self.request.get(TaskArguments.s2t12_private_metadata, "")) or None
+        public_metadata = unicode(self.request.get(TaskArguments.s2t12_public_metadata, "")) or None
+
+        call_result = self.ruleCheck([
+            [transaction_id, PostDataRules.required_name],
+            [transaction_user_uid, PostDataRules.internal_uid],
+            [user_uid, PostDataRules.internal_uid],
+            [needer_uid, PostDataRules.internal_uid],
+            [private_metadata, Datastores.needer._rule_private_metadata_blob],
+            [public_metadata, Datastores.needer._rule_public_metadata_blob],
+        ])
+        debug_data.append(call_result)
+        if call_result[RDK.success] != RC.success:
+            return_msg += "input validation failed"
+            return {
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                'task_results': task_results,
+            }
+
+        user_uid = long(user_uid)
+        needer_uid = long(needer_uid)
+        needer_key = ndb.Key(Datastores.users._get_kind(), user_uid, Datastores.needer._get_kind(), needer_uid)
+
+        call_result = DSF.kget(needer_key)
+        debug_data.append(call_result)
+        if call_result[RDK.success] != RC.success:
+            return_msg += "Datastore access failed"
+            return {
+                RDK.success: RC.datastore_failure, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                'task_results': task_results,
+            }
+        needer = call_result['get_result']
+        if not needer:
+            return_msg += "{} not found".format(needer_key.kind())
+            return {
+                RDK.success: RC.input_validation_failed, RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                'task_results': task_results,
+            }
+        # </end> verify input data
+
+        needer.private_metadata_blob = private_metadata
+        needer.public_metadata_blob = public_metadata
+        call_result = needer.kput()
+        debug_data.append(call_result)
+        if call_result[RDK.success] != RC.success:
+            return_msg += "failed to write needer to datastore"
+            return {
+                RDK.success: call_result[RDK.success], RDK.return_msg: return_msg, RDK.debug_data: debug_data,
+                'task_results': task_results
+            }
+
+        task_results['uid'] = call_result['put_result'].id()
+
+        return {RDK.success: RC.success, RDK.return_msg: return_msg, RDK.debug_data: debug_data, 'task_results': task_results}
+
+
 app = webapp2.WSGIApplication([
     (Services.modify_joins.add_modify_cluster_user.url, AddModifyClusterUser),
     (Services.modify_joins.remove_user_from_cluster.url, RemoveUserFromCluster),
@@ -1127,4 +1195,5 @@ app = webapp2.WSGIApplication([
     (Services.modify_joins.remove_skill_from_user.url, RemoveSkillFromUser),
     (Services.modify_joins.modify_user_information.url, ModifyUserInformation),
     (Services.modify_joins.associate_skill_with_need.url, AssociateSkillWithNeed),
+    (Services.modify_joins.modify_needer.url, ModifyNeeder),
 ], debug=True)
